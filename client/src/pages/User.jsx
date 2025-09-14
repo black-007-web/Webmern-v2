@@ -16,11 +16,9 @@ const User = () => {
         window.location.href = '/login';
         return;
       }
-
       const res = await axios.get(`${BACKEND_URL}/api/user/profile`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-
       setUser(res.data);
       setLoading(false);
     } catch (err) {
@@ -48,10 +46,8 @@ const User = () => {
       const res = await axios.get(`${BACKEND_URL}/api/read/${bookId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-
       if (res.data.pdfUrl) {
-        const fullPdfUrl = `${BACKEND_URL}${res.data.pdfUrl}`;
-        window.open(fullPdfUrl, '_blank');
+        window.open(res.data.pdfUrl, '_blank'); // Use full URL returned by backend as-is
       } else {
         alert('PDF not available for this book.');
       }
@@ -85,7 +81,6 @@ const User = () => {
         clearInterval(interval);
       }
     }, 100);
-
     fetchProfile();
   }, []);
 
@@ -106,7 +101,6 @@ const User = () => {
         height: "100%",
         zIndex: 0
       }}></div>
-
       <div style={{
         position: "relative",
         zIndex: 1,
@@ -123,7 +117,6 @@ const User = () => {
           <h2 style={{ fontSize: "28px", fontWeight: "bold", color: "#fff" }}>👤 {user.name}</h2>
           <p style={{ fontSize: "16px", color: "#ccc" }}><strong>Email:</strong> {user.email}</p>
         </section>
-
         <section>
           <h3 style={{ fontSize: "22px", color: "#00ffff", marginBottom: "20px" }}>📚 Purchased Books</h3>
           {user.purchasedBooks.length === 0 ? (
