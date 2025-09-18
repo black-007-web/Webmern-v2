@@ -26,11 +26,13 @@ const Navbar = () => {
         {adminToken ? (
           <>
             <Link className="neon-link" to="/admin-dashboard">🛠 Admin</Link>
+            <Link className="neon-link" to="/chat">💬 Chat</Link> {/* ✅ Chat for admin */}
             <button className="neon-btn logout-btn" onClick={handleLogout}>🚪 Logout</button>
           </>
         ) : token ? (
           <>
             <Link className="neon-link" to="/user">👤 Profile</Link>
+            <Link className="neon-link" to="/chat">💬 Chat</Link> {/* ✅ Chat only if user logged in */}
             <button className="neon-btn logout-btn" onClick={handleLogout}>🚪 Logout</button>
           </>
         ) : (
