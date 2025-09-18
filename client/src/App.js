@@ -1,3 +1,4 @@
+// Frontend/src/App.js
 import React from 'react';
 import './styles.css';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
@@ -10,7 +11,8 @@ import BookList from './pages/BookList';
 import User from './pages/User';
 import AdminLogin from './pages/AdminLogin'; 
 import AdminDashboard from './pages/AdminDashboard'; 
-import BookReader from './pages/BookReader'; // ✅ NEW
+import BookReader from './pages/BookReader';  // ✅ NEW
+import ChatPage from './pages/ChatPage';      // ✅ NEW
 
 function App() {
   return (
@@ -27,7 +29,10 @@ function App() {
           <Route path="/user" element={<User />} />
 
           {/* Read Book Route */}
-          <Route path="/read/:bookId" element={<BookReader />} /> {/* ✅ NEW */}
+          <Route path="/read/:bookId" element={<BookReader />} /> {/* ✅ ADDED */}
+
+          {/* Chat System Route */}
+          <Route path="/chat" element={<ChatPage />} /> {/* ✅ ADDED */}
 
           {/* Admin Routes */}
           <Route path="/admin-login" element={<AdminLogin />} />
@@ -39,3 +44,4 @@ function App() {
 }
 
 export default App;
+
