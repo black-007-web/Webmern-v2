@@ -6,6 +6,8 @@ import ChatMessage from './ChatMessage';
 import ChatInput from './ChatInput';
 import "../styles.css";
 
+const BACKEND_URL = "https://api-fable-forest.onrender.com"; // ✅ adjust if needed
+
 const Chat = ({ currentUser, isAdmin = false }) => {
   const [socket, setSocket] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -17,47 +19,50 @@ const Chat = ({ currentUser, isAdmin = false }) => {
 
   // 🔌 Establish socket connection
   useEffect(() => {
-    const newSocket = io('http://localhost:5000', {
+    const newSocket = io(BACKEND_URL, {
       auth: {
         token: localStorage.getItem(isAdmin ? 'adminToken' : 'token'),
         isAdmin,
-        userId: currentUser?._id
-      }
+        userId: currentUser?._id,
+      },
     });
 
     setSocket(newSocket);
 
     newSocket.on('connect', () => {
-      console.log('>> Neural network connection established');
+      console.log('✅ Socket connected to backend');
     });
 
     newSocket.on('receiveMessage', (message) => {
-      setMessages(prev => [...prev, message]);
+      setMessages((prev) => [...prev, message]);
       if (message.sender._id !== selectedUser?._id) {
-        setNotifications(prev => ({
+        setNotifications((prev) => ({
           ...prev,
-          [message.sender._id]: (prev[message.sender._id] || 0) + 1
+          [message.sender._id]: (prev[message.sender._id] || 0) + 1,
         }));
       }
     });
 
     newSocket.on('userOnline', (userId) => {
-      setOnlineUsers(prev => [...prev, userId]);
+      setOnlineUsers((prev) => [...prev, userId]);
     });
 
     newSocket.on('userOffline', (userId) => {
-      setOnlineUsers(prev => prev.filter(id => id !== userId));
+      setOnlineUsers((prev) => prev.filter((id) => id !== userId));
     });
 
     newSocket.on('announcement', (announcement) => {
-      setMessages(prev => [...prev, {
-        ...announcement,
-        isAnnouncement: true
-      }]);
+      setMessages((prev) => [
+        ...prev,
+        { ...announcement, isAnnouncement: true },
+      ]);
     });
 
     newSocket.on('typing', (data) => {
-      if (data.userId !== currentUser._id && data.conversationId === selectedUser?._id) {
+      if (
+        data.userId !== currentUser._id &&
+        data.conversationId === selectedUser?._id
+      ) {
         setIsTyping(true);
         setTimeout(() => setIsTyping(false), 3000);
       }
@@ -65,7 +70,7 @@ const Chat = ({ currentUser, isAdmin = false }) => {
 
     newSocket.on('userKicked', ({ userId, reason }) => {
       if (userId === currentUser._id) {
-        alert(`>> Neural link terminated. Reason: ${reason}`);
+        alert(`❌ Disconnected by admin. Reason: ${reason}`);
         window.location.reload();
       }
     });
@@ -77,32 +82,47 @@ const Chat = ({ currentUser, isAdmin = false }) => {
   const fetchUsers = useCallback(async () => {
     try {
       const token = localStorage.getItem(isAdmin ? 'adminToken' : 'token');
-      const endpoint = isAdmin ? '/api/admin/chat/users' : '/api/user/chat/contacts';
+      const endpoint = isAdmin
+        ? `${BACKEND_URL}/api/chat/admin/users`
+        : `${BACKEND_URL}/api/chat/user/contacts`;
+
       const response = await axios.get(endpoint, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
       });
+
       setUsers(response.data);
     } catch (error) {
-      console.error('Error fetching neural contacts:', error);
+      console.error('❌ Error fetching contacts:', error);
     }
   }, [isAdmin]);
 
   // 📡 Fetch messages
-  const fetchMessages = useCallback(async (userId) => {
-    try {
-      const token = localStorage.getItem(isAdmin ? 'adminToken' : 'token');
-      const response = await axios.get(`/api/chat/messages/${userId}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setMessages(response.data);
-      setNotifications(prev => ({
-        ...prev,
-        [userId]: 0
-      }));
-    } catch (error) {
-      console.error('Error loading neural data:', error);
-    }
-  }, [isAdmin]);
+  const fetchMessages = useCallback(
+    async (userId) => {
+      try {
+        const token = localStorage.getItem(isAdmin ? 'adminToken' : 'token');
+        const response = await axios.get(
+          `${BACKEND_URL}/api/chat/messages/${userId}`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+
+        setMessages(response.data.messages || []);
+        setNotifications((prev) => ({
+          ...prev,
+          [userId]: 0,
+        }));
+
+        if (socket) {
+          socket.emit('joinRoom', response.data.conversationId);
+        }
+      } catch (error) {
+        console.error('❌ Error loading messages:', error);
+      }
+    },
+    [isAdmin, socket]
+  );
 
   // 🔄 Initial load
   useEffect(() => {
@@ -117,10 +137,6 @@ const Chat = ({ currentUser, isAdmin = false }) => {
   const handleUserSelect = (user) => {
     setSelectedUser(user);
     fetchMessages(user._id);
-
-    if (socket) {
-      socket.emit('joinRoom', user._id);
-    }
   };
 
   // ✉️ Handle sending messages
@@ -137,14 +153,14 @@ const Chat = ({ currentUser, isAdmin = false }) => {
       }
 
       const token = localStorage.getItem(isAdmin ? 'adminToken' : 'token');
-      await axios.post('/api/chat/send', formData, {
-        headers: { 
+      await axios.post(`${BACKEND_URL}/api/chat/send`, formData, {
+        headers: {
           Authorization: `Bearer ${token}`,
-          'Content-Type': 'multipart/form-data'
-        }
+          'Content-Type': 'multipart/form-data',
+        },
       });
     } catch (error) {
-      console.error('Error transmitting neural data:', error);
+      console.error('❌ Error sending message:', error);
     }
   };
 
@@ -154,30 +170,29 @@ const Chat = ({ currentUser, isAdmin = false }) => {
 
     try {
       const token = localStorage.getItem('adminToken');
-      await axios.post('/api/admin/chat/announcement', {
-        message
-      }, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await axios.post(
+        `${BACKEND_URL}/api/chat/admin/announcement`,
+        { message },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
     } catch (error) {
-      console.error('Error broadcasting system message:', error);
+      console.error('❌ Error sending announcement:', error);
     }
   };
 
   // 🚫 Kick user (admin only)
-  const handleKickUser = async (userId, reason = 'Violation of neural protocols') => {
+  const handleKickUser = async (userId, reason = 'Rule violation') => {
     if (!isAdmin) return;
 
     try {
       const token = localStorage.getItem('adminToken');
-      await axios.post('/api/admin/chat/kick', {
-        userId,
-        reason
-      }, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await axios.post(
+        `${BACKEND_URL}/api/chat/admin/kick`,
+        { userId, reason },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
     } catch (error) {
-      console.error('Error executing termination protocol:', error);
+      console.error('❌ Error kicking user:', error);
     }
   };
 
@@ -187,12 +202,13 @@ const Chat = ({ currentUser, isAdmin = false }) => {
 
     try {
       const token = localStorage.getItem('adminToken');
-      await axios.delete(`/api/admin/chat/message/${messageId}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setMessages(prev => prev.filter(msg => msg._id !== messageId));
+      await axios.delete(
+        `${BACKEND_URL}/api/chat/admin/message/${messageId}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setMessages((prev) => prev.filter((msg) => msg._id !== messageId));
     } catch (error) {
-      console.error('Error purging neural data:', error);
+      console.error('❌ Error deleting message:', error);
     }
   };
 
@@ -201,14 +217,14 @@ const Chat = ({ currentUser, isAdmin = false }) => {
     if (socket && selectedUser) {
       socket.emit('typing', {
         userId: currentUser._id,
-        conversationId: selectedUser._id
+        conversationId: selectedUser._id,
       });
     }
   };
 
   return (
     <div className="chat-container">
-      {/* Geometric Network Background */}
+      {/* Background */}
       <div className="particle-network">
         <div className="geometric-sphere">
           <div className="sphere-container">
@@ -216,22 +232,6 @@ const Chat = ({ currentUser, isAdmin = false }) => {
             <div className="sphere-ring ring-2"></div>
             <div className="sphere-ring ring-3"></div>
             <div className="sphere-ring ring-4"></div>
-            <div className="vertical-line v-line-1"></div>
-            <div className="vertical-line v-line-2"></div>
-            <div className="vertical-line v-line-3"></div>
-            <div className="horizontal-line h-line-1"></div>
-            <div className="horizontal-line h-line-2"></div>
-            <div className="horizontal-line h-line-3"></div>
-            <div className="node node-1"></div>
-            <div className="node node-2"></div>
-            <div className="node node-3"></div>
-            <div className="node node-4"></div>
-            <div className="node node-5"></div>
-            <div className="node node-6"></div>
-            <div className="connection-line conn-1"></div>
-            <div className="connection-line conn-2"></div>
-            <div className="connection-line conn-3"></div>
-            <div className="connection-line conn-4"></div>
           </div>
         </div>
       </div>
@@ -239,109 +239,81 @@ const Chat = ({ currentUser, isAdmin = false }) => {
       {/* Chat Interface */}
       <div className="chat-interface">
         <div className="chat-header">
-          <h2>{isAdmin ? 'ADMIN_NEURAL_CONTROL' : 'NEURAL_CHAT_INTERFACE'}</h2>
+          <h2>{isAdmin ? 'ADMIN CONTROL PANEL' : 'CHAT INTERFACE'}</h2>
         </div>
 
         <div className="chat-body">
-          {/* Users Sidebar */}
+          {/* Sidebar */}
           <div className="chat-sidebar">
             <div className="sidebar-header">
-              <h3>{isAdmin ? 'CONNECTED_USERS' : 'NEURAL_LINKS'}</h3>
+              <h3>{isAdmin ? 'Users' : 'Contacts'}</h3>
               {isAdmin && (
-                <div className="admin-controls">
-                  <button 
-                    className="announcement-btn"
-                    onClick={() => setSelectedUser({ _id: 'all', name: 'BROADCAST_ALL' })}
-                  >
-                    📢 BROADCAST
-                  </button>
-                </div>
+                <button
+                  className="announcement-btn"
+                  onClick={() =>
+                    setSelectedUser({ _id: 'all', name: 'BROADCAST_ALL' })
+                  }
+                >
+                  📢 Broadcast
+                </button>
               )}
             </div>
 
             <div className="users-list">
-              {!isAdmin && (
-                <div 
-                  className={`user-item priority-admin ${selectedUser?._id === 'admin' ? 'active' : ''}`}
-                  onClick={() => handleUserSelect({ _id: 'admin', name: 'SYSTEM_ADMIN', isAdmin: true })}
-                >
-                  <div className="user-avatar admin-avatar">⚡</div>
-                  <div className="user-info">
-                    <div className="user-name">SYSTEM_ADMIN</div>
-                    <div className="user-status">ALWAYS_ONLINE</div>
-                  </div>
-                  {notifications['admin'] > 0 && (
-                    <div className="notification-badge">{notifications['admin']}</div>
-                  )}
-                </div>
-              )}
-
-              {users.map(user => (
-                <div 
+              {users.map((user) => (
+                <div
                   key={user._id}
-                  className={`user-item ${selectedUser?._id === user._id ? 'active' : ''}`}
+                  className={`user-item ${
+                    selectedUser?._id === user._id ? 'active' : ''
+                  }`}
                   onClick={() => handleUserSelect(user)}
                 >
                   <div className="user-avatar">
                     {user.name.charAt(0).toUpperCase()}
                   </div>
                   <div className="user-info">
-                    <div className="user-name">{user.name.toUpperCase().replace(' ', '_')}</div>
+                    <div className="user-name">{user.name}</div>
                     <div className="user-status">
-                      {onlineUsers.includes(user._id) ? 'NEURAL_ACTIVE' : 'NEURAL_OFFLINE'}
+                      {onlineUsers.includes(user._id)
+                        ? 'Online'
+                        : 'Offline'}
                     </div>
                   </div>
-                  
                   {notifications[user._id] > 0 && (
-                    <div className="notification-badge">{notifications[user._id]}</div>
-                  )}
-                  
-                  {isAdmin && (
-                    <div className="admin-user-controls">
-                      <button 
-                        className="kick-btn"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          const reason = prompt('>> Enter termination protocol reason:', 'Violation of neural protocols');
-                          if (reason) handleKickUser(user._id, reason);
-                        }}
-                      >
-                        🚫
-                      </button>
+                    <div className="notification-badge">
+                      {notifications[user._id]}
                     </div>
+                  )}
+                  {isAdmin && (
+                    <button
+                      className="kick-btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const reason = prompt(
+                          'Kick reason:',
+                          'Rule violation'
+                        );
+                        if (reason) handleKickUser(user._id, reason);
+                      }}
+                    >
+                      🚫
+                    </button>
                   )}
                 </div>
               ))}
             </div>
           </div>
 
-          {/* Chat Main Area */}
+          {/* Main Chat */}
           <div className="chat-main">
             {selectedUser ? (
               <>
                 <div className="chat-main-header">
-                  <div className="chat-user-info">
-                    <h3>{selectedUser.name}</h3>
-                    {isAdmin && selectedUser._id !== 'all' && (
-                      <div className="admin-chat-controls">
-                        <button 
-                          onClick={() => {
-                            if (window.confirm('>> CONFIRM: Execute complete neural data purge?')) {
-                              // Clear chat history logic here
-                            }
-                          }}
-                        >
-                          🗑️ PURGE_DATA
-                        </button>
-                      </div>
-                    )}
-                  </div>
+                  <h3>{selectedUser.name}</h3>
                 </div>
-
-                {/* Messages Container */}
                 <div className="messages-container">
                   {messages.map((message, index) => (
-                    <ChatMessage 
+                    <ChatMessage
                       key={index}
                       message={message}
                       currentUser={currentUser}
@@ -349,22 +321,16 @@ const Chat = ({ currentUser, isAdmin = false }) => {
                       onDelete={handleDeleteMessage}
                     />
                   ))}
-                  
                   {isTyping && (
-                    <div className="typing-indicator">
-                      <div className="typing-dots">
-                        <div className="dot"></div>
-                        <div className="dot"></div>
-                        <div className="dot"></div>
-                      </div>
-                      <span>Processing neural data...</span>
-                    </div>
+                    <div className="typing-indicator">Typing...</div>
                   )}
                 </div>
-
-                {/* Chat Input */}
-                <ChatInput 
-                  onSendMessage={selectedUser._id === 'all' ? handleSendAnnouncement : handleSendMessage}
+                <ChatInput
+                  onSendMessage={
+                    selectedUser._id === 'all'
+                      ? handleSendAnnouncement
+                      : handleSendMessage
+                  }
                   onTyping={handleTyping}
                   isAdmin={isAdmin}
                   isBroadcast={selectedUser._id === 'all'}
@@ -372,8 +338,7 @@ const Chat = ({ currentUser, isAdmin = false }) => {
               </>
             ) : (
               <div className="no-chat-selected">
-                <h3> SELECT_NEURAL_LINK_TO_INITIALIZE</h3>
-                <p>Choose a connection from the neural network</p>
+                <h3>Select a user to start chatting</h3>
               </div>
             )}
           </div>
@@ -384,3 +349,4 @@ const Chat = ({ currentUser, isAdmin = false }) => {
 };
 
 export default Chat;
+
