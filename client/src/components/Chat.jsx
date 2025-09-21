@@ -349,4 +349,3 @@ const Chat = ({ currentUser, isAdmin = false }) => {
 };
 
 export default Chat;
-
